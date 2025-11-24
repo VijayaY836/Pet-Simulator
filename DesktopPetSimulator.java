@@ -4,7 +4,6 @@ import java.awt.event.*;
 import java.awt.geom.*;
 import java.util.ArrayList;
 import java.util.Random;
-import java.awt.Image;
 
 
 public class DesktopPetSimulator extends JFrame {
@@ -156,15 +155,68 @@ public class DesktopPetSimulator extends JFrame {
     }
 
     private void handlePlay() {
-        if (energy < 20) {
-            showNotification("I'm too tired...");
-            return;
-        }
-        
-        // Launch Flappy Bird game
-        new FlappyBirdGame(this);
-        // Game runs modally, so this executes after game closes
+    if (energy < 20) {
+        showNotification("I'm too tired...");
+        return;
     }
+    
+    // Create custom dialog for game selection
+    JDialog gameDialog = new JDialog(this, "Choose Your Game!", true);
+    gameDialog.setSize(400, 300);
+    gameDialog.setLocationRelativeTo(this);
+    gameDialog.setLayout(new BorderLayout(10, 10));
+    gameDialog.getContentPane().setBackground(new Color(240, 240, 250));
+    
+    // Title
+    JLabel titleLabel = new JLabel("Pick a Game to Play!", SwingConstants.CENTER);
+    titleLabel.setFont(new Font("Arial", Font.BOLD, 24));
+    titleLabel.setForeground(new Color(100, 100, 255));
+    titleLabel.setBorder(BorderFactory.createEmptyBorder(20, 10, 10, 10));
+    gameDialog.add(titleLabel, BorderLayout.NORTH);
+    
+    // Game buttons panel
+    JPanel gamesPanel = new JPanel(new GridLayout(3, 1, 10, 10));
+    gamesPanel.setBackground(new Color(240, 240, 250));
+    gamesPanel.setBorder(BorderFactory.createEmptyBorder(10, 30, 30, 30));
+    
+    // Flappy Pet button
+    JButton flappyBtn = createStyledButton("🐦 Flappy Pet - Dodge Obstacles", new Color(100, 150, 255));
+    flappyBtn.addActionListener(e -> {
+        gameDialog.dispose();
+        new FlappyBirdGame(this);
+    });
+    
+    // Maze Runner button
+    JButton mazeBtn = createStyledButton("🏃 Maze Runner - Find the Exit", new Color(150, 100, 255));
+    mazeBtn.addActionListener(e -> {
+        gameDialog.dispose();
+        new MazeRunnerGame(this);
+    });
+    
+    // Catch Food button
+    JButton catchBtn = createStyledButton("🍕 Catch Food - Don't Miss!", new Color(255, 140, 100));
+    catchBtn.addActionListener(e -> {
+        gameDialog.dispose();
+        new CatchFoodGame(this);
+    });
+    
+    gamesPanel.add(flappyBtn);
+    gamesPanel.add(mazeBtn);
+    gamesPanel.add(catchBtn);
+    
+    gameDialog.add(gamesPanel, BorderLayout.CENTER);
+    
+    // Cancel button
+    JPanel bottomPanel = new JPanel();
+    bottomPanel.setBackground(new Color(240, 240, 250));
+    JButton cancelBtn = new JButton("Cancel");
+    cancelBtn.setFont(new Font("Arial", Font.PLAIN, 12));
+    cancelBtn.addActionListener(e -> gameDialog.dispose());
+    bottomPanel.add(cancelBtn);
+    gameDialog.add(bottomPanel, BorderLayout.SOUTH);
+    
+    gameDialog.setVisible(true);
+}
 
     private void handleSleep() {
         if (energy > 80) {
@@ -710,6 +762,7 @@ public class DesktopPetSimulator extends JFrame {
 
             gamePanel.repaint();
         }
+        
 
         class GamePanel extends JPanel {
             @Override
@@ -769,6 +822,349 @@ public class DesktopPetSimulator extends JFrame {
             }
         }
     }
+
+// Maze Runner Mini-Game
+class MazeRunnerGame extends JDialog {
+    private MazePanel mazePanel;
+    private int playerX = 1, playerY = 1;
+    private int goalX = 13, goalY = 13;
+    private int score = 0;
+    private int moves = 0;
+    private boolean gameWon = false;
+    private DesktopPetSimulator parent;
+    
+    // Simple maze (0 = wall, 1 = path)
+    private int[][] maze;
+    private void generateMaze() {
+    int size = 15; // Bigger maze (was 15)
+    maze = new int[size][size];
+    
+    // Fill with walls
+    for (int i = 0; i < size; i++) {
+        for (int j = 0; j < size; j++) {
+            maze[i][j] = 0;
+        }
+    }
+    
+    // Recursive backtracking maze generation
+    Random rand = new Random();
+    carvePath(1, 1, rand);
+    
+    // Ensure start and goal are paths
+    maze[1][1] = 1;
+    maze[size-2][size-2] = 1;
+    
+    // Update goal position
+    goalX = size - 2;
+    goalY = size - 2;
+}
+
+private void carvePath(int x, int y, Random rand) {
+    maze[y][x] = 1;
+    
+    // Directions: right, down, left, up
+    int[][] directions = {{2, 0}, {0, 2}, {-2, 0}, {0, -2}};
+    
+    // Shuffle directions
+    for (int i = directions.length - 1; i > 0; i--) {
+        int j = rand.nextInt(i + 1);
+        int[] temp = directions[i];
+        directions[i] = directions[j];
+        directions[j] = temp;
+    }
+    
+    // Try each direction
+    for (int[] dir : directions) {
+        int nx = x + dir[0];
+        int ny = y + dir[1];
+        
+        if (nx > 0 && ny > 0 && nx < maze[0].length - 1 && ny < maze.length - 1 && maze[ny][nx] == 0) {
+            maze[y + dir[1]/2][x + dir[0]/2] = 1; // Carve path between cells
+            carvePath(nx, ny, rand);
+        }
+    }
+}
+
+    public MazeRunnerGame(DesktopPetSimulator parent) {
+        super(parent, "Maze Runner", true);
+        this.parent = parent;
+        generateMaze(); // Generate random maze
+        setSize(450, 500);
+        setLocationRelativeTo(parent);
+        setResizable(false);
+
+        mazePanel = new MazePanel();
+        add(mazePanel);
+
+        addKeyListener(new KeyAdapter() {
+            public void keyPressed(KeyEvent e) {
+                if (gameWon) {
+                    endGame();
+                    return;
+                }
+                
+                int newX = playerX;
+                int newY = playerY;
+                
+                switch(e.getKeyCode()) {
+                    case KeyEvent.VK_UP, KeyEvent.VK_W -> newY--;
+                    case KeyEvent.VK_DOWN, KeyEvent.VK_S -> newY++;
+                    case KeyEvent.VK_LEFT, KeyEvent.VK_A -> newX--;
+                    case KeyEvent.VK_RIGHT, KeyEvent.VK_D -> newX++;
+                }
+                
+                // Check if move is valid
+                if (maze[newY][newX] == 1) {
+                    playerX = newX;
+                    playerY = newY;
+                    moves++;
+                    
+                    // Check if reached goal
+                    if (playerX == goalX && playerY == goalY) {
+                        gameWon = true;
+                        score = Math.max(0, 100 - moves);
+                    }
+                    
+                    mazePanel.repaint();
+                }
+            }
+        });
+
+        setVisible(true);
+    }
+
+    private void endGame() {
+        parent.onGameComplete(score);
+        dispose();
+    }
+
+    class MazePanel extends JPanel {
+        @Override
+        protected void paintComponent(Graphics g) {
+            super.paintComponent(g);
+            Graphics2D g2 = (Graphics2D) g;
+            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+
+            int cellSize = 30;
+            
+            // Draw maze
+            for (int y = 0; y < maze.length; y++) {
+                for (int x = 0; x < maze[y].length; x++) {
+                    if (maze[y][x] == 0) {
+                        g2.setColor(new Color(60, 60, 60));
+                        g2.fillRect(x * cellSize, y * cellSize, cellSize, cellSize);
+                    } else {
+                        g2.setColor(new Color(240, 240, 250));
+                        g2.fillRect(x * cellSize, y * cellSize, cellSize, cellSize);
+                    }
+                    g2.setColor(new Color(200, 200, 200));
+                    g2.drawRect(x * cellSize, y * cellSize, cellSize, cellSize);
+                }
+            }
+            
+            // Draw goal
+            g2.setColor(new Color(255, 215, 0));
+            g2.fillOval(goalX * cellSize + 5, goalY * cellSize + 5, cellSize - 10, cellSize - 10);
+            g2.setColor(new Color(255, 180, 0));
+            g2.setStroke(new BasicStroke(2));
+            g2.drawOval(goalX * cellSize + 5, goalY * cellSize + 5, cellSize - 10, cellSize - 10);
+            
+            // Draw player (pet)
+            Color petColor = getMoodColor();
+            g2.setColor(petColor);
+            g2.fillOval(playerX * cellSize + 3, playerY * cellSize + 3, cellSize - 6, cellSize - 6);
+            
+            // Eyes
+            g2.setColor(Color.BLACK);
+            g2.fillOval(playerX * cellSize + 8, playerY * cellSize + 10, 4, 4);
+            g2.fillOval(playerX * cellSize + 16, playerY * cellSize + 10, 4, 4);
+
+            // Instructions and stats
+            g2.setColor(Color.BLACK);
+            g2.setFont(new Font("Arial", Font.BOLD, 14));
+            g2.drawString("Moves: " + moves, 10, 470);
+            g2.drawString("Use WASD or Arrow Keys", 150, 470);
+            
+            // Game won
+            if (gameWon) {
+                g2.setColor(new Color(0, 0, 0, 180));
+                g2.fillRect(0, 0, getWidth(), getHeight());
+                g2.setColor(Color.WHITE);
+                g2.setFont(new Font("Arial", Font.BOLD, 40));
+                g2.drawString("You Win!", 140, 200);
+                g2.setFont(new Font("Arial", Font.PLAIN, 20));
+                g2.drawString("Score: " + score, 170, 250);
+                g2.drawString("Press any key to close", 100, 300);
+            }
+        }
+    }
+}
+
+    // Catch the Falling Food Mini-Game
+class CatchFoodGame extends JDialog {
+    private CatchPanel catchPanel;
+    private Timer gameTimer;
+    private int basketX = 200;
+    private ArrayList<FallingFood> foods = new ArrayList<>();
+    private int score = 0;
+    private int missed = 0;
+    private boolean gameOver = false;
+    private int frameCount = 0;
+    private DesktopPetSimulator parent;
+
+    public CatchFoodGame(DesktopPetSimulator parent) {
+        super(parent, "Catch the Food", true);
+        this.parent = parent;
+        setSize(400, 500);
+        setLocationRelativeTo(parent);
+        setResizable(false);
+
+        catchPanel = new CatchPanel();
+        add(catchPanel);
+
+        addMouseMotionListener(new MouseMotionAdapter() {
+            public void mouseMoved(MouseEvent e) {
+                basketX = Math.max(30, Math.min(e.getX(), 370));
+            }
+        });
+
+        addKeyListener(new KeyAdapter() {
+            public void keyPressed(KeyEvent e) {
+                if (gameOver) {
+                    endGame();
+                } else {
+                    switch(e.getKeyCode()) {
+                        case KeyEvent.VK_LEFT, KeyEvent.VK_A -> basketX = Math.max(30, basketX - 20);
+                        case KeyEvent.VK_RIGHT, KeyEvent.VK_D -> basketX = Math.min(370, basketX + 20);
+                    }
+                }
+            }
+        });
+
+        gameTimer = new Timer(20, e -> updateGame());
+        gameTimer.start();
+
+        setVisible(true);
+    }
+
+    private void endGame() {
+        gameTimer.stop();
+        parent.onGameComplete(score);
+        dispose();
+    }
+
+    private void updateGame() {
+        if (gameOver) return;
+
+        frameCount++;
+        
+        // Spawn food
+        if (frameCount % 50 == 0) {
+            foods.add(new FallingFood(new Random().nextInt(350) + 25));
+        }
+
+        // Update foods
+        for (FallingFood food : foods) {
+            food.y += 3;
+            
+            // Check catch
+            if (food.y > 420 && food.y < 450 && 
+                Math.abs(food.x - basketX) < 40 && !food.caught) {
+                food.caught = true;
+                score++;
+            }
+            
+            // Check missed
+            if (food.y > 500 && !food.caught && !food.missed) {
+                food.missed = true;
+                missed++;
+            }
+        }
+        
+        foods.removeIf(f -> f.y > 520);
+
+        // Game over after 5 misses
+        if (missed >= 5) {
+            gameOver = true;
+        }
+
+        catchPanel.repaint();
+    }
+
+    class CatchPanel extends JPanel {
+        @Override
+        protected void paintComponent(Graphics g) {
+            super.paintComponent(g);
+            Graphics2D g2 = (Graphics2D) g;
+            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+
+            // Background
+            g2.setColor(new Color(135, 206, 235));
+            g2.fillRect(0, 0, getWidth(), getHeight());
+
+            // Draw falling foods
+            for (FallingFood food : foods) {
+                if (!food.caught) {
+                    // Pizza slice
+                    g2.setColor(new Color(255, 200, 100));
+                    int[] xPoints = {food.x - 15, food.x + 15, food.x};
+                    int[] yPoints = {food.y, food.y, food.y - 20};
+                    g2.fillPolygon(xPoints, yPoints, 3);
+                    
+                    g2.setColor(new Color(200, 50, 50));
+                    g2.fillOval(food.x - 5, food.y - 10, 6, 6);
+                    g2.fillOval(food.x + 3, food.y - 8, 6, 6);
+                }
+            }
+
+            // Draw basket (pet's face)
+            Color petColor = getMoodColor();
+            g2.setColor(petColor);
+            g2.fillOval(basketX - 30, 420, 60, 60);
+            
+            // Eyes
+            g2.setColor(Color.BLACK);
+            g2.fillOval(basketX - 18, 435, 10, 10);
+            g2.fillOval(basketX + 8, 435, 10, 10);
+            
+            // Mouth
+            g2.setStroke(new BasicStroke(2));
+            g2.drawArc(basketX - 15, 445, 30, 20, 0, -180);
+
+            // Score display
+            g2.setFont(new Font("Arial", Font.BOLD, 20));
+            g2.setColor(Color.WHITE);
+            g2.drawString("Score: " + score, 20, 30);
+            g2.drawString("Missed: " + missed + "/5", 280, 30);
+
+            // Instructions
+            g2.setFont(new Font("Arial", Font.PLAIN, 14));
+            g2.drawString("Move mouse or A/D keys", 110, 55);
+
+            // Game over
+            if (gameOver) {
+                g2.setColor(new Color(0, 0, 0, 180));
+                g2.fillRect(0, 0, getWidth(), getHeight());
+                g2.setColor(Color.WHITE);
+                g2.setFont(new Font("Arial", Font.BOLD, 40));
+                g2.drawString("Game Over!", 100, 200);
+                g2.setFont(new Font("Arial", Font.PLAIN, 20));
+                g2.drawString("Final Score: " + score, 130, 250);
+                g2.drawString("Press any key to close", 90, 300);
+            }
+        }
+    }
+
+    class FallingFood {
+        int x, y = 0;
+        boolean caught = false;
+        boolean missed = false;
+
+        FallingFood(int x) {
+            this.x = x;
+        }
+    }
+}
 
     public static void main(String[] args) {
         SwingUtilities.invokeLater(() -> {
