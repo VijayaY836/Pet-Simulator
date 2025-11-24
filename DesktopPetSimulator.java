@@ -4,6 +4,8 @@ import java.awt.event.*;
 import java.awt.geom.*;
 import java.util.ArrayList;
 import java.util.Random;
+import java.awt.Image;
+
 
 public class DesktopPetSimulator extends JFrame {
     private PetPanel petPanel;
@@ -314,8 +316,14 @@ public class DesktopPetSimulator extends JFrame {
     }
 
     class PetPanel extends JPanel {
+        private Image backgroundImage;
         public PetPanel() {
             setBackground(new Color(255, 250, 250));
+            try {
+                backgroundImage = new ImageIcon("Bg.png").getImage();
+            } catch (Exception e) {
+                System.out.println("Background image not found: " + e.getMessage());
+            }
             
             // Add mouse click listener for interaction
             addMouseListener(new MouseAdapter() {
@@ -356,6 +364,10 @@ public class DesktopPetSimulator extends JFrame {
             super.paintComponent(g);
             Graphics2D g2 = (Graphics2D) g;
             g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            // Draw background image if loaded
+            if (backgroundImage != null) {
+            g2.drawImage(backgroundImage, 0, 0, getWidth(), getHeight(), this);
+            }
 
             int centerX = getWidth() / 2;
             int centerY = getHeight() / 2;
